@@ -11,6 +11,6 @@ public class HelloWorldController
   @RequestMapping(value = "/", method = { RequestMethod.GET })
   public String healthCheck()
   {
-    return "Hello world!";
+    return "Flywire Exercise Application is running!";
   }
 }

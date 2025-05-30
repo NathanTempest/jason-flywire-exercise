@@ -14,39 +14,29 @@ import java.util.stream.Collectors;
 public class EmployeeService {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final List<Employee> employeeList = new ArrayList<>();
 
-    // Load the JSON file from the classpath
-    private File getDataFile() throws IOException {
-        return new ClassPathResource("json/data.json").getFile();
+    public EmployeeService() {
+        try {
+            File file = new ClassPathResource("json/data.json").getFile();
+            Employee[] employees = objectMapper.readValue(file, Employee[].class);
+            employeeList.addAll(Arrays.asList(employees));
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to load employees from JSON file", e);
+        }
     }
 
-    // Read employees from JSON file
-    private List<Employee> readEmployees() throws IOException {
-        File file = getDataFile();
-        Employee[] employees = objectMapper.readValue(file, Employee[].class);
-        return new ArrayList<>(Arrays.asList(employees));
-    }
-
-    // Write employees back to JSON file
-    private void writeEmployees(List<Employee> employees) throws IOException {
-        File file = getDataFile();
-        objectMapper.writerWithDefaultPrettyPrinter().writeValue(file, employees);
-    }
-
-    // 1. Get all active employees sorted by last name alphabetically
-    public List<Employee> getAllActiveEmployees() throws IOException {
-        List<Employee> employees = readEmployees();
-        return employees.stream()
+    // 1. Get all active employees sorted by last name
+    public List<Employee> getAllActiveEmployees() {
+        return employeeList.stream()
                 .filter(Employee::isActive)
                 .sorted(Comparator.comparing(Employee::getLastName, String.CASE_INSENSITIVE_ORDER))
                 .collect(Collectors.toList());
     }
 
-    // 2. Get employee by ID with direct reports' names
-    public Optional<Map<String, Object>> getEmployeeWithDirectReports(int id) throws IOException {
-        List<Employee> employees = readEmployees();
-
-        Optional<Employee> employeeOpt = employees.stream()
+    // 2. Get employee with direct reports
+    public Optional<Map<String, Object>> getEmployeeWithDirectReports(int id) {
+        Optional<Employee> employeeOpt = employeeList.stream()
                 .filter(emp -> emp.getId() == id)
                 .findFirst();
 
@@ -58,7 +48,7 @@ public class EmployeeService {
 
         List<String> directReportNames = employee.getDirectReports() == null
                 ? Collections.emptyList()
-                : employees.stream()
+                : employeeList.stream()
                     .filter(emp -> employee.getDirectReports().contains(emp.getId()))
                     .map(Employee::getName)
                     .collect(Collectors.toList());
@@ -70,11 +60,9 @@ public class EmployeeService {
         return Optional.of(result);
     }
 
-    // 3. Get employees hired within a date range, sorted descending by hire date
-    public List<Employee> getEmployeesHiredWithin(Date start, Date end) throws IOException {
-        List<Employee> employees = readEmployees();
-
-        return employees.stream()
+    // 3. Get employees hired in a range
+    public List<Employee> getEmployeesHiredWithin(Date start, Date end) {
+        return employeeList.stream()
                 .filter(emp -> {
                     Date hireDate = emp.getHireDate();
                     return hireDate != null && !hireDate.before(start) && !hireDate.after(end);
@@ -83,44 +71,30 @@ public class EmployeeService {
                 .collect(Collectors.toList());
     }
 
-    // 4. Create a new employee and save it
-    public Employee createEmployee(Employee newEmployee) throws IOException {
-        List<Employee> employees = readEmployees();
-
-        // Basic validation: unique ID
-        boolean idExists = employees.stream()
+    // 4. Create new employee (in-memory only)
+    public Employee createEmployee(Employee newEmployee) {
+        boolean idExists = employeeList.stream()
                 .anyMatch(emp -> emp.getId() == newEmployee.getId());
 
         if (idExists) {
             throw new IllegalArgumentException("Employee with ID " + newEmployee.getId() + " already exists.");
         }
 
-        employees.add(newEmployee);
-        writeEmployees(employees);
+        employeeList.add(newEmployee);
         return newEmployee;
     }
 
-    // 5. Deactivate employee by ID
-    public boolean deactivateEmployee(int id) throws IOException {
-        List<Employee> employees = readEmployees();
-
-        Optional<Employee> employeeOpt = employees.stream()
+    // 5. Deactivate employee by ID (in-memory only)
+    public boolean deactivateEmployee(int id) {
+        Optional<Employee> employeeOpt = employeeList.stream()
                 .filter(emp -> emp.getId() == id)
                 .findFirst();
 
-        if (!employeeOpt.isPresent()) {
+        if (!employeeOpt.isPresent() || !employeeOpt.get().isActive()) {
             return false;
         }
 
-        Employee employee = employeeOpt.get();
-
-        if (!employee.isActive()) {
-            // Already inactive
-            return false;
-        }
-
-        employee.setActive(false);
-        writeEmployees(employees);
+        employeeOpt.get().setActive(false);
         return true;
     }
 }
